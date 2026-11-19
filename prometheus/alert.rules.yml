@@ -1,0 +1,52 @@
+groups:
+  - name: docker-host
+    rules:
+      - alert: TargetDown
+        expr: up == 0
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: "Target {{ $labels.job }} ngừng phản hồi"
+
+      - alert: HostHighCPU
+        expr: 100 - avg(rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100 > 85
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "CPU máy chủ trên 85% ({{ $value | printf \"%.0f\" }}%)"
+
+      - alert: HostHighMemory
+        expr: (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100 > 90
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "RAM máy chủ trên 90% ({{ $value | printf \"%.0f\" }}%)"
+
+      - alert: HostDiskLow
+        expr: node_filesystem_avail_bytes{fstype=~"ext4|xfs|btrfs"} / node_filesystem_size_bytes{fstype=~"ext4|xfs|btrfs"} < 0.10
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "Ổ đĩa {{ $labels.mountpoint }} còn dưới 10%"
+
+  - name: docker-containers
+    rules:
+      - alert: ContainerGone
+        expr: time() - container_last_seen{name!=""} > 60
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: "Container {{ $labels.name }} đã dừng hoặc biến mất"
+
+      - alert: ContainerRestartLoop
+        expr: changes(container_start_time_seconds{name!=""}[10m]) > 2
+        labels: { severity: warning }
+        annotations:
+          summary: "Container {{ $labels.name }} restart liên tục"
+
+      - alert: ContainerHighMemory
+        expr: (container_memory_working_set_bytes{name!=""} / (container_spec_memory_limit_bytes{name!=""} > 0)) > 0.9
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "Container {{ $labels.name }} dùng trên 90% giới hạn RAM"
